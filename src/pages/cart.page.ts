@@ -1,4 +1,4 @@
-import type { Page, Locator } from 'playwright';
+import type { Page } from 'playwright';
 import { BasePage } from './base.page.js';
 import { SELECTORS } from '../selectors/index.js';
 import type { CartItem } from '../models/product.js';
@@ -29,23 +29,16 @@ export class CartPage extends BasePage {
     const subtotalText = await this.getText(SELECTORS.cart.cartSubtotal, 3000);
 
     // Check for Whole Foods / Amazon Fresh collapsed cart section
-    const almSection = await this.tryFindFirst(['[id*="sc-localmarket-cart"]'], 2000);
+    const groceryCartUrl = await this.getGroceryCartUrl();
     let groceryItems: CartItem[] = [];
     let grocerySubtotal: number | null = null;
 
-    if (almSection) {
-      // Get the brand ID from the ALM section
-      const almBuyBox = await this.tryFindFirst(['#sc-alm-buy-box'], 2000);
-      const brandId = almBuyBox ? await almBuyBox.getAttribute('data-brand-id') : null;
-
-      if (brandId) {
-        // Navigate to the localmarket cart to get WF/Fresh items
-        await this.navigateTo(`https://www.amazon.com/cart/localmarket?almBrandId=${brandId}`);
-        await humanDelay(500, 1500);
-        groceryItems = await this.parseCartItems();
-        const grocerySubtotalText = await this.getText(SELECTORS.cart.cartSubtotal, 3000);
-        grocerySubtotal = this.parsePrice(grocerySubtotalText);
-      }
+    if (groceryCartUrl) {
+      await this.navigateTo(groceryCartUrl);
+      await humanDelay(500, 1500);
+      groceryItems = await this.parseCartItems();
+      const grocerySubtotalText = await this.getText(SELECTORS.cart.cartSubtotal, 3000);
+      grocerySubtotal = this.parsePrice(grocerySubtotalText);
     }
 
     return {
@@ -65,12 +58,12 @@ export class CartPage extends BasePage {
         const asin = await loc.getAttribute('data-asin');
         if (!asin) continue;
 
-        const title = await this.getLocatorText(loc, SELECTORS.cart.cartItemTitle);
+        const title = await this.getChildText(loc, SELECTORS.cart.cartItemTitle);
         if (!title) continue;
 
-        const priceText = await this.getLocatorText(loc, SELECTORS.cart.cartItemPrice);
-        const qtyVal = await this.getLocatorInputValue(loc, SELECTORS.cart.cartItemQuantity);
-        const imageUrl = await this.getLocatorAttr(loc, SELECTORS.cart.cartItemImage, 'src');
+        const priceText = await this.getChildText(loc, SELECTORS.cart.cartItemPrice);
+        const qtyVal = await this.getChildInputValue(loc, SELECTORS.cart.cartItemQuantity);
+        const imageUrl = await this.getChildAttr(loc, SELECTORS.cart.cartItemImage, 'src');
 
         items.push({
           asin,
@@ -92,11 +85,7 @@ export class CartPage extends BasePage {
     if (await this.updateQtyOnCurrentPage(asin, quantity)) return true;
 
     // Try WF/Fresh cart
-    const almBuyBox = await this.tryFindFirst(['#sc-alm-buy-box'], 2000);
-    const brandId = almBuyBox ? await almBuyBox.getAttribute('data-brand-id') : null;
-    if (brandId) {
-      await this.navigateTo(`https://www.amazon.com/cart/localmarket?almBrandId=${brandId}`);
-      await humanDelay(500, 1500);
+    if (await this.navigateToGroceryCart()) {
       if (await this.updateQtyOnCurrentPage(asin, quantity)) return true;
     }
 
@@ -132,11 +121,7 @@ export class CartPage extends BasePage {
     if (await this.removeFromCurrentPage(asin)) return true;
 
     // Try WF/Fresh cart
-    const almBuyBox = await this.tryFindFirst(['#sc-alm-buy-box'], 2000);
-    const brandId = almBuyBox ? await almBuyBox.getAttribute('data-brand-id') : null;
-    if (brandId) {
-      await this.navigateTo(`https://www.amazon.com/cart/localmarket?almBrandId=${brandId}`);
-      await humanDelay(500, 1500);
+    if (await this.navigateToGroceryCart()) {
       if (await this.removeFromCurrentPage(asin)) return true;
     }
 
@@ -148,7 +133,7 @@ export class CartPage extends BasePage {
     for (const loc of itemLocators) {
       const itemAsin = await loc.getAttribute('data-asin');
       if (itemAsin === asin) {
-        await this.clickFirstMatch(loc, SELECTORS.cart.cartItemDelete);
+        await this.clickFirstChildMatch(loc, SELECTORS.cart.cartItemDelete);
         await humanDelay(1000, 2000);
         return true;
       }
@@ -164,11 +149,7 @@ export class CartPage extends BasePage {
     totalRemoved += await this.clearCurrentPage();
 
     // Clear WF/Fresh cart if present
-    const almBuyBox = await this.tryFindFirst(['#sc-alm-buy-box'], 2000);
-    const brandId = almBuyBox ? await almBuyBox.getAttribute('data-brand-id') : null;
-    if (brandId) {
-      await this.navigateTo(`https://www.amazon.com/cart/localmarket?almBrandId=${brandId}`);
-      await humanDelay(500, 1500);
+    if (await this.navigateToGroceryCart()) {
       totalRemoved += await this.clearCurrentPage();
     }
 
@@ -180,60 +161,24 @@ export class CartPage extends BasePage {
     while (true) {
       const itemLocators = await this.findAll(SELECTORS.cart.cartItems, 3000);
       if (itemLocators.length === 0) break;
-      await this.clickFirstMatch(itemLocators[0], SELECTORS.cart.cartItemDelete);
+      await this.clickFirstChildMatch(itemLocators[0], SELECTORS.cart.cartItemDelete);
       await humanDelay(1500, 2500);
       removed++;
     }
     return removed;
   }
 
-  private async getLocatorText(parent: Locator, chain: readonly string[]): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const text = await parent.locator(sel).first().textContent({ timeout: 1000 });
-        if (text) return text.trim();
-      } catch {
-        continue;
-      }
-    }
-    return null;
+  private async getGroceryCartUrl(): Promise<string | null> {
+    const almBuyBox = await this.tryFindFirst(['#sc-alm-buy-box'], 2000);
+    const brandId = almBuyBox ? await almBuyBox.getAttribute('data-brand-id') : null;
+    return brandId ? `https://www.amazon.com/cart/localmarket?almBrandId=${brandId}` : null;
   }
 
-  private async getLocatorInputValue(parent: Locator, chain: readonly string[]): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const val = await parent.locator(sel).first().inputValue({ timeout: 1000 });
-        if (val) return val;
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
-  private async getLocatorAttr(parent: Locator, chain: readonly string[], attr: string): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const val = await parent.locator(sel).first().getAttribute(attr, { timeout: 1000 });
-        if (val) return val;
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
-  private async clickFirstMatch(parent: Locator, chain: readonly string[]): Promise<void> {
-    for (const sel of chain) {
-      try {
-        const el = parent.locator(sel).first();
-        if ((await el.count()) > 0) {
-          await el.click({ timeout: 3000 });
-          return;
-        }
-      } catch {
-        continue;
-      }
-    }
+  private async navigateToGroceryCart(): Promise<boolean> {
+    const url = await this.getGroceryCartUrl();
+    if (!url) return false;
+    await this.navigateTo(url);
+    await humanDelay(500, 1500);
+    return true;
   }
 }

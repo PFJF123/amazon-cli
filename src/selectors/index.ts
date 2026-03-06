@@ -110,6 +110,13 @@ export const SELECTORS = {
     orderItemTitle: ['.yohtmlc-product-title', 'a[href*="/dp/"]'] as SelectorChain,
     orderItemLink: ['.yohtmlc-product-title a', 'a[href*="/dp/"]'] as SelectorChain,
     timeFilter: ['#time-filter', 'select#time-filter', '#orderFilter'] as SelectorChain,
+    headerValues: ['.order-header .a-size-base.a-color-secondary.aok-break-word'] as SelectorChain,
+    trackingLink: ['a[href*="track"]', 'a:has-text("Track package")'] as SelectorChain,
+    estimatedDelivery: ['.delivery-box__primary-text', 'span.a-size-medium.a-color-success'] as SelectorChain,
+    detailDate: ['.order-date-invoice-item span.a-color-secondary', '.order-info .value'] as SelectorChain,
+    detailTotal: ['#od-subtotals .a-text-right .a-color-base', '.order-summary-total .a-color-price'] as SelectorChain,
+    detailDeliveryEta: ['#primaryDeliveryCountdown', '.delivery-box__primary-text', 'span:has-text("Arriving")'] as SelectorChain,
+    productLinks: ['a[href*="/dp/"]', 'a[href*="/gp/product/"]'] as SelectorChain,
   },
 
   // Grocery (Whole Foods / Amazon Fresh)

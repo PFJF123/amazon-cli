@@ -122,4 +122,65 @@ export class BasePage {
     const num = parseFloat(match);
     return isNaN(num) ? null : num;
   }
+
+  protected async getChildText(parent: Locator, chain: readonly string[]): Promise<string | null> {
+    for (const sel of chain) {
+      try {
+        const text = await parent.locator(sel).first().textContent({ timeout: 1000 });
+        if (text) return text.trim();
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  protected async getChildAttr(parent: Locator, chain: readonly string[], attr: string): Promise<string | null> {
+    for (const sel of chain) {
+      try {
+        const val = await parent.locator(sel).first().getAttribute(attr, { timeout: 1000 });
+        if (val) return val;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  protected async getChildInputValue(parent: Locator, chain: readonly string[]): Promise<string | null> {
+    for (const sel of chain) {
+      try {
+        const val = await parent.locator(sel).first().inputValue({ timeout: 1000 });
+        if (val) return val;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  protected async hasChildMatch(parent: Locator, chain: readonly string[]): Promise<boolean> {
+    for (const sel of chain) {
+      try {
+        if ((await parent.locator(sel).count()) > 0) return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  protected async clickFirstChildMatch(parent: Locator, chain: readonly string[]): Promise<void> {
+    for (const sel of chain) {
+      try {
+        const el = parent.locator(sel).first();
+        if ((await el.count()) > 0) {
+          await el.click({ timeout: 3000 });
+          return;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }
 }

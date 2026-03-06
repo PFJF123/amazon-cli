@@ -60,7 +60,7 @@ export class GroceryCheckoutPage extends BasePage {
     const deliveryDays: GroceryDeliveryDay[] = [];
 
     for (let i = 0; i < dayTabs.length; i++) {
-      const label = await this.getLocatorText(dayTabs[i], SELECTORS.groceryCheckout.deliveryDayLabel);
+      const label = await this.getChildText(dayTabs[i], SELECTORS.groceryCheckout.deliveryDayLabel);
       if (label) {
         deliveryDays.push({ label, index: i });
       }
@@ -77,8 +77,8 @@ export class GroceryCheckoutPage extends BasePage {
     const slots: GroceryDeliverySlot[] = [];
 
     for (let i = 0; i < slotElements.length; i++) {
-      const time = await this.getLocatorText(slotElements[i], SELECTORS.groceryCheckout.deliveryTimeLabel);
-      const cost = await this.getLocatorText(slotElements[i], SELECTORS.groceryCheckout.deliveryTimeCost);
+      const time = await this.getChildText(slotElements[i], SELECTORS.groceryCheckout.deliveryTimeLabel);
+      const cost = await this.getChildText(slotElements[i], SELECTORS.groceryCheckout.deliveryTimeCost);
       if (time) {
         slots.push({ time, cost, dayIndex, slotIndex: i });
       }
@@ -117,17 +117,5 @@ export class GroceryCheckoutPage extends BasePage {
 
     const confirmation = await this.tryFindFirst(SELECTORS.groceryCheckout.confirmationPage, 15000);
     return !!confirmation;
-  }
-
-  private async getLocatorText(parent: import('playwright').Locator, chain: readonly string[]): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const text = await parent.locator(sel).first().textContent({ timeout: 1000 });
-        if (text) return text.trim();
-      } catch {
-        continue;
-      }
-    }
-    return null;
   }
 }

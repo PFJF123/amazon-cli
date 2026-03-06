@@ -32,12 +32,12 @@ export class SubscribePage extends BasePage {
 
     for (let i = 0; i < items.length; i++) {
       try {
-        const title = await this.getLocatorText(items[i], SELECTORS.subscribeAndSave.snsItemTitle);
+        const title = await this.getChildText(items[i], SELECTORS.subscribeAndSave.snsItemTitle);
         if (!title) continue;
 
-        const frequency = await this.getLocatorText(items[i], SELECTORS.subscribeAndSave.snsItemFrequency);
-        const nextDelivery = await this.getLocatorText(items[i], SELECTORS.subscribeAndSave.snsItemNextDelivery);
-        const price = await this.getLocatorText(items[i], SELECTORS.subscribeAndSave.snsItemPrice);
+        const frequency = await this.getChildText(items[i], SELECTORS.subscribeAndSave.snsItemFrequency);
+        const nextDelivery = await this.getChildText(items[i], SELECTORS.subscribeAndSave.snsItemNextDelivery);
+        const price = await this.getChildText(items[i], SELECTORS.subscribeAndSave.snsItemPrice);
 
         subscriptions.push({ title, frequency, nextDelivery, price, index: i });
       } catch {
@@ -111,17 +111,5 @@ export class SubscribePage extends BasePage {
     await addBtn.click();
     await humanDelay(1500, 3000);
     return true;
-  }
-
-  private async getLocatorText(parent: import('playwright').Locator, chain: readonly string[]): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const text = await parent.locator(sel).first().textContent({ timeout: 1000 });
-        if (text) return text.trim();
-      } catch {
-        continue;
-      }
-    }
-    return null;
   }
 }

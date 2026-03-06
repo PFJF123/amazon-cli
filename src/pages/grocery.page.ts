@@ -41,38 +41,6 @@ export class GroceryPage extends BasePage {
     super(page);
   }
 
-  async setAddress(addressQuery: string): Promise<boolean> {
-    await this.navigateTo('https://www.amazon.com');
-    await humanDelay(500, 1000);
-
-    // Open location popover
-    const locBtn = await this.findFirst(SELECTORS.grocery.locationPopover);
-    await locBtn.click();
-    await humanDelay(1500, 2500);
-
-    // Find the matching address
-    const addressItems = this.page.locator(SELECTORS.grocery.addressList[0]);
-    const count = await addressItems.count();
-
-    for (let i = 0; i < count; i++) {
-      const text = await addressItems.nth(i).textContent().catch(() => null);
-      if (text && text.toLowerCase().includes(addressQuery.toLowerCase())) {
-        // Click the submit button within this address item
-        const submitBtn = addressItems.nth(i).locator(SELECTORS.grocery.addressSubmitButton[0]).first();
-        if ((await submitBtn.count()) > 0) {
-          await submitBtn.click({ force: true });
-          await humanDelay(3000, 5000);
-
-          // Verify the change took effect
-          const newLocation = await this.getText(SELECTORS.grocery.locationText, 3000);
-          return newLocation !== null;
-        }
-      }
-    }
-
-    return false;
-  }
-
   async getDeliveryInfo(asin: string): Promise<DeliveryInfo> {
     await this.navigateTo(`https://www.amazon.com/dp/${asin}`);
     await humanDelay(1000, 2000);
@@ -105,7 +73,7 @@ export class GroceryPage extends BasePage {
       if (unavailable) return [];
     }
 
-    return this.parseGroceryResults(limit);
+    return this.parseSearchResults(limit);
   }
 
   async getCategories(store: GroceryStore = 'wholefoods'): Promise<GroceryCategory[]> {
@@ -140,7 +108,7 @@ export class GroceryPage extends BasePage {
   async browseCategory(categoryUrl: string, limit = 10): Promise<Product[]> {
     await this.navigateTo(categoryUrl);
     await humanDelay(1000, 2000);
-    return this.parseGroceryResults(limit);
+    return this.parseSearchResults(limit);
   }
 
   async addToCart(asin: string, quantity = 1, mode: FulfillmentMode = 'delivery'): Promise<boolean> {
@@ -201,7 +169,7 @@ export class GroceryPage extends BasePage {
     }
   }
 
-  private async parseGroceryResults(limit: number): Promise<Product[]> {
+  private async parseSearchResults(limit: number): Promise<Product[]> {
     const items = await this.findAll(SELECTORS.search.resultItems, 8000);
     const products: Product[] = [];
 
@@ -212,14 +180,14 @@ export class GroceryPage extends BasePage {
         const asin = await item.getAttribute('data-asin');
         if (!asin || asin === '') continue;
 
-        const title = await this.getInnerText(item, SELECTORS.search.resultTitle);
+        const title = await this.getChildText(item, SELECTORS.search.resultTitle);
         if (!title) continue;
 
-        const priceText = await this.getInnerText(item, SELECTORS.search.resultPrice);
-        const ratingText = await this.getInnerText(item, SELECTORS.search.resultRating);
-        const reviewText = await this.getInnerText(item, SELECTORS.search.resultReviewCount);
-        const imageUrl = await this.getAttr(item, SELECTORS.search.resultImage, 'src');
-        const isPrime = await this.hasMatch(item, SELECTORS.search.resultPrimeBadge);
+        const priceText = await this.getChildText(item, SELECTORS.search.resultPrice);
+        const ratingText = await this.getChildText(item, SELECTORS.search.resultRating);
+        const reviewText = await this.getChildText(item, SELECTORS.search.resultReviewCount);
+        const imageUrl = await this.getChildAttr(item, SELECTORS.search.resultImage, 'src');
+        const isPrime = await this.hasChildMatch(item, SELECTORS.search.resultPrimeBadge);
 
         products.push({
           asin,
@@ -237,40 +205,5 @@ export class GroceryPage extends BasePage {
     }
 
     return products;
-  }
-
-  private async getInnerText(parent: import('playwright').Locator, chain: readonly string[]): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const text = await parent.locator(sel).first().textContent({ timeout: 1000 });
-        if (text) return text.trim();
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
-  private async getAttr(parent: import('playwright').Locator, chain: readonly string[], attr: string): Promise<string | null> {
-    for (const sel of chain) {
-      try {
-        const val = await parent.locator(sel).first().getAttribute(attr, { timeout: 1000 });
-        if (val) return val;
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
-  private async hasMatch(parent: import('playwright').Locator, chain: readonly string[]): Promise<boolean> {
-    for (const sel of chain) {
-      try {
-        if ((await parent.locator(sel).count()) > 0) return true;
-      } catch {
-        continue;
-      }
-    }
-    return false;
   }
 }

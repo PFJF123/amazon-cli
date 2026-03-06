@@ -1,6 +1,7 @@
 import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { GroceryPage, type GroceryStore, type FulfillmentMode } from '../pages/grocery.page.js';
+import { AddressPage } from '../pages/address.page.js';
 import { formatProductTable } from '../ui/formatters.js';
 import { selectProducts } from '../ui/prompts.js';
 
@@ -28,10 +29,10 @@ function validateStore(store: string | undefined): GroceryStore {
 
 export async function grocerySetAddressCommand(query: string, opts: SessionOptions): Promise<void> {
   await withSession(opts, async (page) => {
-    const groceryPage = new GroceryPage(page);
+    const addressPage = new AddressPage(page);
 
     console.log(pc.dim(`\n  Setting delivery address to "${query}"...\n`));
-    const success = await groceryPage.setAddress(query);
+    const success = await addressPage.setAddress(query);
 
     if (success) {
       console.log(pc.green(`  Delivery address updated!\n`));
