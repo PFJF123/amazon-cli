@@ -1,0 +1,93 @@
+import type { Page } from 'playwright';
+import { BasePage } from './base.page.js';
+import { SELECTORS } from '../selectors/index.js';
+import type { Product } from '../models/product.js';
+import { humanDelay } from '../browser/humanize.js';
+
+export interface SearchOptions {
+  sort?: string;
+  prime?: boolean;
+  maxPrice?: number;
+  limit?: number;
+}
+
+export class SearchPage extends BasePage {
+  constructor(page: Page) {
+    super(page);
+  }
+
+  async search(query: string, opts: SearchOptions = {}): Promise<Product[]> {
+    let url = `https://www.amazon.com/s?k=${encodeURIComponent(query)}`;
+    if (opts.prime) url += '&rh=p_85%3A2470955011';
+    if (opts.maxPrice) url += `&rh=p_36%3A-${opts.maxPrice * 100}`;
+    if (opts.sort) {
+      const sortMap: Record<string, string> = {
+        'price-asc': 'price-asc-rank',
+        'price-desc': 'price-desc-rank',
+        'rating': 'review-rank',
+        'newest': 'date-desc-rank',
+        'best-seller': 'exact-aware-popularity-rank',
+      };
+      url += `&s=${sortMap[opts.sort] || opts.sort}`;
+    }
+
+    await this.navigateTo(url);
+    await humanDelay(1000, 2000);
+
+    const limit = opts.limit ?? 10;
+    return this.parseResults(limit);
+  }
+
+  private async parseResults(limit: number): Promise<Product[]> {
+    const items = await this.findAll(SELECTORS.search.resultItems, 8000);
+    const products: Product[] = [];
+
+    for (const item of items.slice(0, limit + 5)) {
+      if (products.length >= limit) break;
+
+      try {
+        const asin = await item.getAttribute('data-asin');
+        if (!asin || asin === '') continue;
+
+        const titleEl = item.locator(SELECTORS.search.resultTitle[0]).first();
+        const title = await titleEl.textContent().catch(() => null);
+        if (!title) continue;
+
+        const priceText = await this.getInnerText(item, SELECTORS.search.resultPrice);
+        const ratingText = await this.getInnerText(item, SELECTORS.search.resultRating);
+        const reviewText = await this.getInnerText(item, SELECTORS.search.resultReviewCount);
+        const imgEl = item.locator(SELECTORS.search.resultImage[0]).first();
+        const imageUrl = await imgEl.getAttribute('src').catch(() => null);
+        const isPrime = (await item.locator(SELECTORS.search.resultPrimeBadge[0]).count()) > 0;
+
+        products.push({
+          asin,
+          title: title.trim(),
+          price: this.parsePrice(priceText),
+          rating: ratingText ? parseFloat(ratingText.split(' ')[0]) : null,
+          reviewCount: reviewText ? parseInt(reviewText.replace(/[^0-9]/g, '')) || null : null,
+          isPrime,
+          imageUrl,
+          url: `https://www.amazon.com/dp/${asin}`,
+        });
+      } catch {
+        continue;
+      }
+    }
+
+    return products;
+  }
+
+  private async getInnerText(parent: import('playwright').Locator, chain: readonly string[]): Promise<string | null> {
+    for (const sel of chain) {
+      try {
+        const el = parent.locator(sel).first();
+        const text = await el.textContent({ timeout: 1000 });
+        if (text) return text.trim();
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+}
