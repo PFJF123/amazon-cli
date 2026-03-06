@@ -28,7 +28,7 @@ Built with [Playwright](https://playwright.dev/) for browser automation and [Com
 ## Install
 
 ```bash
-git clone https://github.com/justinfeldstein/amazon-cli.git
+git clone https://github.com/PFJF123/amazon-cli.git
 cd amazon-cli
 npm install
 npm run build
