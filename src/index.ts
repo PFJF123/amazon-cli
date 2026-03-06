@@ -3,10 +3,13 @@ import { handleError } from './errors/index.js';
 import { loginCommand } from './commands/login.js';
 import { searchCommand } from './commands/search.js';
 import { productCommand } from './commands/product.js';
-import { cartListCommand, cartAddCommand, cartRemoveCommand, cartClearCommand } from './commands/cart.js';
+import { cartListCommand, cartAddCommand, cartRemoveCommand, cartUpdateCommand, cartClearCommand } from './commands/cart.js';
 import { staplesListCommand, staplesAddCommand, staplesRemoveCommand, staplesOrderCommand } from './commands/staples.js';
-import { ordersCommand, orderDetailCommand } from './commands/orders.js';
+import { ordersCommand, orderDetailCommand, orderTrackCommand, orderReorderCommand } from './commands/orders.js';
 import { checkoutCommand } from './commands/checkout.js';
+import { grocerySearchCommand, groceryCategoriesCommand, groceryBrowseCommand, groceryAddCommand, grocerySetAddressCommand, groceryInfoCommand } from './commands/grocery.js';
+import { addressListCommand, addressSetCommand } from './commands/address.js';
+import { subscribeListCommand, subscribeInfoCommand, subscribeAddCommand } from './commands/subscribe.js';
 
 const program = new Command();
 
@@ -21,6 +24,9 @@ program
 
 function getGlobalOpts() {
   const opts = program.opts();
+  if (opts.debug) {
+    process.env.AMZ_DEBUG = '1';
+  }
   return {
     headless: opts.headless ?? false,
     timeout: parseInt(opts.timeout),
@@ -90,6 +96,17 @@ cart
   .action(async (asin, qty) => {
     try {
       await cartAddCommand(asin, qty, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+cart
+  .command('update <asin> <qty>')
+  .description('Update item quantity in cart')
+  .action(async (asin, qty) => {
+    try {
+      await cartUpdateCommand(asin, qty, getGlobalOpts());
     } catch (err) {
       handleError(err);
     }
@@ -203,11 +220,175 @@ orders
     }
   });
 
+orders
+  .command('track <id>')
+  .description('Track a specific order')
+  .action(async (id) => {
+    try {
+      await orderTrackCommand(id, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+orders
+  .command('reorder <id>')
+  .description('Re-add all items from a past order to cart')
+  .action(async (id) => {
+    try {
+      await orderReorderCommand(id, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+// amz grocery
+const grocery = program.command('grocery').description('Whole Foods & Amazon Fresh grocery shopping');
+
+grocery
+  .command('setaddress <query>')
+  .description('Set delivery address (matches against saved addresses)')
+  .action(async (query) => {
+    try {
+      await grocerySetAddressCommand(query, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+grocery
+  .command('info <asin>')
+  .description('Check delivery/pickup availability for a grocery item')
+  .action(async (asin) => {
+    try {
+      await groceryInfoCommand(asin, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+grocery
+  .command('search <query>')
+  .description('Search grocery items')
+  .option('--store <store>', 'Store: wholefoods or fresh (default: wholefoods)')
+  .option('--limit <n>', 'Number of results', parseInt)
+  .option('--add', 'Interactive: select results to add to cart')
+  .option('--pickup', 'Add items for pickup instead of delivery')
+  .action(async (query, opts) => {
+    try {
+      await grocerySearchCommand(query, { ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+grocery
+  .command('categories')
+  .description('List grocery categories')
+  .option('--store <store>', 'Store: wholefoods or fresh (default: wholefoods)')
+  .action(async (opts) => {
+    try {
+      await groceryCategoriesCommand({ ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+grocery
+  .command('browse <category>')
+  .description('Browse a grocery category')
+  .option('--store <store>', 'Store: wholefoods or fresh (default: wholefoods)')
+  .option('--limit <n>', 'Number of results', parseInt)
+  .option('--add', 'Interactive: select results to add to cart')
+  .option('--pickup', 'Add items for pickup instead of delivery')
+  .action(async (category, opts) => {
+    try {
+      await groceryBrowseCommand(category, { ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+grocery
+  .command('add <asin> [qty]')
+  .description('Add grocery item to cart')
+  .option('--pickup', 'Add for pickup instead of delivery')
+  .action(async (asin, qty, opts) => {
+    try {
+      await groceryAddCommand(asin, qty, { ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+// amz address
+const address = program.command('address').description('Manage delivery addresses');
+
+address
+  .command('list')
+  .description('Show saved addresses')
+  .action(async () => {
+    try {
+      await addressListCommand(getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+address
+  .command('set <query>')
+  .description('Set active delivery address (matches against saved addresses)')
+  .action(async (query) => {
+    try {
+      await addressSetCommand(query, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+// amz subscribe
+const subscribe = program.command('subscribe').description('Manage Subscribe & Save');
+
+subscribe
+  .command('list')
+  .description('List active subscriptions')
+  .action(async () => {
+    try {
+      await subscribeListCommand(getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+subscribe
+  .command('info <asin>')
+  .description('Check if a product supports Subscribe & Save')
+  .action(async (asin) => {
+    try {
+      await subscribeInfoCommand(asin, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+subscribe
+  .command('add <asin>')
+  .description('Subscribe to a product and add to cart')
+  .option('--frequency <n>', 'Frequency option (1-based index from `subscribe info`)', parseInt)
+  .action(async (asin, opts) => {
+    try {
+      await subscribeAddCommand(asin, { ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
 // amz checkout
 program
   .command('checkout')
   .description('Checkout cart')
   .option('--dry-run', 'Show summary without purchasing')
+  .option('--grocery', 'Checkout Whole Foods / Amazon Fresh cart')
   .option('--slot <index>', 'Select delivery slot by index', parseInt)
   .action(async (opts) => {
     try {

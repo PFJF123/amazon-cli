@@ -1,5 +1,5 @@
 import pc from 'picocolors';
-import { getPage, closeSession, type SessionOptions } from '../browser/session.js';
+import { withSession, type SessionOptions } from '../browser/session.js';
 import { ProductPage } from '../pages/product.page.js';
 import { listStaples, addStaple, removeStaple } from '../store/staples-store.js';
 import { formatStaples } from '../ui/formatters.js';
@@ -36,11 +36,11 @@ export async function staplesAddCommand(opts: StaplesAddOpts & SessionOptions): 
   // Fetch product title from Amazon
   let title = asin;
   try {
-    const page = await getPage(opts);
-    const productPage = new ProductPage(page);
-    const product = await productPage.getProduct(asin);
-    title = product.title;
-    await closeSession();
+    await withSession(opts, async (page) => {
+      const productPage = new ProductPage(page);
+      const product = await productPage.getProduct(asin);
+      title = product.title;
+    });
   } catch {
     console.log(pc.dim('  Could not fetch product title, using ASIN as name.'));
   }
@@ -76,24 +76,31 @@ export async function staplesOrderCommand(category: string | undefined, opts: Se
   const selected = await selectStaples(staples);
   if (selected.length === 0) return;
 
-  const page = await getPage(opts);
-  const productPage = new ProductPage(page);
+  await withSession(opts, async (page) => {
+    const productPage = new ProductPage(page);
+    let succeeded = 0;
+    let failed = 0;
 
-  for (const s of selected) {
-    console.log(pc.dim(`  Adding ${s.title.slice(0, 40)}... (x${s.quantity})`));
-    try {
-      await productPage.addToCart(s.asin, s.quantity);
-      console.log(pc.green(`  Added!`));
-    } catch (err) {
-      console.log(pc.red(`  Failed to add ${s.asin}: ${err instanceof Error ? err.message : 'unknown error'}`));
+    for (const s of selected) {
+      console.log(pc.dim(`  Adding ${s.title.slice(0, 40)}... (x${s.quantity})`));
+      try {
+        await productPage.addToCart(s.asin, s.quantity);
+        console.log(pc.green(`  Added!`));
+        succeeded++;
+      } catch (err) {
+        console.log(pc.red(`  Failed to add ${s.asin}: ${err instanceof Error ? err.message : 'unknown error'}`));
+        failed++;
+      }
     }
-  }
 
-  console.log('');
-  const checkout = await confirmAction('Proceed to checkout?');
-  if (checkout) {
-    console.log(pc.dim('  Run `amz checkout` to complete your order.\n'));
-  }
+    console.log('');
+    if (failed > 0) {
+      console.log(pc.yellow(`  Summary: ${succeeded} added, ${failed} failed out of ${selected.length} items.\n`));
+    }
 
-  await closeSession();
+    const checkout = await confirmAction('Proceed to checkout?');
+    if (checkout) {
+      console.log(pc.dim('  Run `amz checkout` to complete your order.\n'));
+    }
+  });
 }

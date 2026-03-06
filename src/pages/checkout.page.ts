@@ -51,6 +51,14 @@ export class CheckoutPage extends BasePage {
     return { address, total, deliverySlots };
   }
 
+  async selectDeliverySlot(index: number): Promise<void> {
+    const slots = await this.findAll(SELECTORS.checkout.deliverySlots, 5000);
+    if (index >= 0 && index < slots.length) {
+      await slots[index].click();
+      await humanDelay(1000, 2000);
+    }
+  }
+
   async placeOrder(): Promise<boolean> {
     const placeBtn = await this.findFirst(SELECTORS.checkout.placeOrderButton, 10000);
     await placeBtn.click();

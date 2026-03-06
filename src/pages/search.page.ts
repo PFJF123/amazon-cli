@@ -18,8 +18,10 @@ export class SearchPage extends BasePage {
 
   async search(query: string, opts: SearchOptions = {}): Promise<Product[]> {
     let url = `https://www.amazon.com/s?k=${encodeURIComponent(query)}`;
-    if (opts.prime) url += '&rh=p_85%3A2470955011';
-    if (opts.maxPrice) url += `&rh=p_36%3A-${opts.maxPrice * 100}`;
+    const rhParts: string[] = [];
+    if (opts.prime) rhParts.push('p_85%3A2470955011');
+    if (opts.maxPrice) rhParts.push(`p_36%3A-${opts.maxPrice * 100}`);
+    if (rhParts.length > 0) url += `&rh=${rhParts.join('%2C')}`;
     if (opts.sort) {
       const sortMap: Record<string, string> = {
         'price-asc': 'price-asc-rank',
@@ -49,16 +51,14 @@ export class SearchPage extends BasePage {
         const asin = await item.getAttribute('data-asin');
         if (!asin || asin === '') continue;
 
-        const titleEl = item.locator(SELECTORS.search.resultTitle[0]).first();
-        const title = await titleEl.textContent().catch(() => null);
+        const title = await this.getInnerText(item, SELECTORS.search.resultTitle);
         if (!title) continue;
 
         const priceText = await this.getInnerText(item, SELECTORS.search.resultPrice);
         const ratingText = await this.getInnerText(item, SELECTORS.search.resultRating);
         const reviewText = await this.getInnerText(item, SELECTORS.search.resultReviewCount);
-        const imgEl = item.locator(SELECTORS.search.resultImage[0]).first();
-        const imageUrl = await imgEl.getAttribute('src').catch(() => null);
-        const isPrime = (await item.locator(SELECTORS.search.resultPrimeBadge[0]).count()) > 0;
+        const imageUrl = await this.getAttr(item, SELECTORS.search.resultImage, 'src');
+        const isPrime = await this.hasMatch(item, SELECTORS.search.resultPrimeBadge);
 
         products.push({
           asin,
@@ -76,6 +76,29 @@ export class SearchPage extends BasePage {
     }
 
     return products;
+  }
+
+  private async getAttr(parent: import('playwright').Locator, chain: readonly string[], attr: string): Promise<string | null> {
+    for (const sel of chain) {
+      try {
+        const val = await parent.locator(sel).first().getAttribute(attr, { timeout: 1000 });
+        if (val) return val;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  private async hasMatch(parent: import('playwright').Locator, chain: readonly string[]): Promise<boolean> {
+    for (const sel of chain) {
+      try {
+        if ((await parent.locator(sel).count()) > 0) return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
   }
 
   private async getInnerText(parent: import('playwright').Locator, chain: readonly string[]): Promise<string | null> {

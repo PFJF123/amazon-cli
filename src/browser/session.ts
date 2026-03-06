@@ -1,6 +1,5 @@
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { CHROME_PROFILE_DIR, ensureDataDir } from '../utils/paths.js';
-import { AsyncLock } from './lock.js';
 
 export interface SessionOptions {
   headless?: boolean;
@@ -10,7 +9,6 @@ export interface SessionOptions {
 
 let context: BrowserContext | null = null;
 let currentPage: Page | null = null;
-const authLock = new AsyncLock();
 
 export async function getContext(opts: SessionOptions = {}): Promise<BrowserContext> {
   if (context) return context;
@@ -37,14 +35,19 @@ export async function getPage(opts: SessionOptions = {}): Promise<Page> {
   return currentPage;
 }
 
-export function getAuthLock(): AsyncLock {
-  return authLock;
-}
-
 export async function closeSession(): Promise<void> {
   if (context) {
     await context.close();
     context = null;
     currentPage = null;
+  }
+}
+
+export async function withSession<T>(opts: SessionOptions, fn: (page: Page) => Promise<T>): Promise<T> {
+  const page = await getPage(opts);
+  try {
+    return await fn(page);
+  } finally {
+    await closeSession();
   }
 }

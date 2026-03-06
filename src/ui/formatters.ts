@@ -72,6 +72,12 @@ export function formatOrders(orders: Order[]): string {
     lines.push(`  ${pc.dim('Date:')}   ${order.date}`);
     lines.push(`  ${pc.dim('Total:')}  ${order.total ? pc.green(`$${order.total.toFixed(2)}`) : pc.dim('N/A')}`);
     lines.push(`  ${pc.dim('Status:')} ${order.status}`);
+    if (order.estimatedDelivery) {
+      lines.push(`  ${pc.dim('ETA:')}    ${pc.cyan(order.estimatedDelivery)}`);
+    }
+    if (order.trackingUrl) {
+      lines.push(`  ${pc.dim('Track:')}  ${pc.dim(order.trackingUrl)}`);
+    }
     if (order.items.length > 0) {
       lines.push(`  ${pc.dim('Items:')}`);
       for (const item of order.items) {

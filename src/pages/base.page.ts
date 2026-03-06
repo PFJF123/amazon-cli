@@ -1,8 +1,11 @@
 import type { Page, Locator } from 'playwright';
+import pc from 'picocolors';
 import type { SelectorChain } from '../selectors/index.js';
 import { SELECTORS } from '../selectors/index.js';
-import { SelectorBreakageError, AuthRequiredError, CaptchaDetectedError, BotDetectionError } from '../errors/index.js';
+import { SelectorBreakageError, AuthRequiredError } from '../errors/index.js';
 import { humanDelay } from '../browser/humanize.js';
+
+const CAPTCHA_WAIT_TIMEOUT = 120000; // 2 minutes to solve captcha
 
 export class BasePage {
   constructor(protected page: Page) {}
@@ -76,25 +79,41 @@ export class BasePage {
     }
   }
 
-  async checkForCaptcha(): Promise<void> {
-    const captcha = await this.tryFindFirst(SELECTORS.botDetection.captchaPage, 1000);
-    if (captcha) {
-      throw new CaptchaDetectedError();
-    }
+  private isCaptchaPage(): boolean {
+    const url = this.page.url();
+    return url.includes('validateCaptcha') || url.includes('/errors/validateCaptcha');
   }
 
-  async checkForBotDetection(): Promise<void> {
-    const url = this.page.url();
-    if (url.includes('validateCaptcha') || url.includes('/errors/validateCaptcha')) {
-      throw new BotDetectionError();
+  private async hasCaptchaElement(): Promise<boolean> {
+    const captcha = await this.tryFindFirst(SELECTORS.botDetection.captchaPage, 1000);
+    return !!captcha;
+  }
+
+  async waitForCaptchaResolution(): Promise<void> {
+    if (!this.isCaptchaPage() && !(await this.hasCaptchaElement())) return;
+
+    console.log(pc.yellow('\n  CAPTCHA detected. Please solve it in the browser window.'));
+    console.log(pc.dim('  Waiting up to 2 minutes...\n'));
+
+    const start = Date.now();
+    while (Date.now() - start < CAPTCHA_WAIT_TIMEOUT) {
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // Check if we've moved past the captcha page
+      if (!this.isCaptchaPage() && !(await this.hasCaptchaElement())) {
+        console.log(pc.green('  CAPTCHA solved. Continuing...\n'));
+        await humanDelay(500, 1000);
+        return;
+      }
     }
-    await this.checkForCaptcha();
+
+    throw new Error('CAPTCHA was not solved within 2 minutes. Please try again.');
   }
 
   async navigateTo(url: string): Promise<void> {
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     await humanDelay(500, 1500);
-    await this.checkForBotDetection();
+    await this.waitForCaptchaResolution();
   }
 
   parsePrice(text: string | null): number | null {

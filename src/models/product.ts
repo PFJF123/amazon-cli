@@ -30,6 +30,8 @@ export interface Order {
   total: number | null;
   status: string;
   items: OrderItem[];
+  trackingUrl: string | null;
+  estimatedDelivery: string | null;
 }
 
 export interface OrderItem {
