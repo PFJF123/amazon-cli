@@ -9,6 +9,9 @@ export interface SessionOptions {
 
 let context: BrowserContext | null = null;
 let currentPage: Page | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function getContext(opts: SessionOptions = {}): Promise<BrowserContext> {
   if (context) return context;
@@ -36,6 +39,7 @@ export async function getPage(opts: SessionOptions = {}): Promise<Page> {
 }
 
 export async function closeSession(): Promise<void> {
+  clearIdleTimer();
   if (context) {
     await context.close();
     context = null;
@@ -51,3 +55,30 @@ export async function withSession<T>(opts: SessionOptions, fn: (page: Page) => P
     await closeSession();
   }
 }
+
+// Idle timeout management for long-lived sessions (MCP)
+export function resetIdleTimer(): void {
+  clearIdleTimer();
+  idleTimer = setTimeout(async () => {
+    await closeSession();
+  }, IDLE_TIMEOUT_MS);
+}
+
+function clearIdleTimer(): void {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+}
+
+// Graceful cleanup on process signals
+function setupCleanup(): void {
+  const cleanup = async () => {
+    await closeSession();
+    process.exit(0);
+  };
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+}
+
+setupCleanup();

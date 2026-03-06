@@ -2,7 +2,12 @@ import * as clack from '@clack/prompts';
 import pc from 'picocolors';
 import type { Product, Staple } from '../models/product.js';
 
+function isNonInteractive(): boolean {
+  return !process.stdin.isTTY || process.env.AMZ_NON_INTERACTIVE === '1';
+}
+
 export async function confirmAction(message: string): Promise<boolean> {
+  if (isNonInteractive()) return true;
   const result = await clack.confirm({ message });
   if (clack.isCancel(result)) {
     clack.cancel('Cancelled.');
@@ -12,6 +17,7 @@ export async function confirmAction(message: string): Promise<boolean> {
 }
 
 export async function selectProducts(products: Product[]): Promise<Product[]> {
+  if (isNonInteractive()) return products;
   const result = await clack.multiselect({
     message: 'Select products to add to cart:',
     options: products.map((p) => ({
@@ -29,6 +35,7 @@ export async function selectProducts(products: Product[]): Promise<Product[]> {
 }
 
 export async function selectStaples(staples: Staple[]): Promise<Staple[]> {
+  if (isNonInteractive()) return staples;
   const result = await clack.multiselect({
     message: 'Select staples to order:',
     options: staples.map((s) => ({

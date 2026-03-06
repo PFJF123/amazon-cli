@@ -1,15 +1,28 @@
 {
   "name": "amazon-cli",
-  "version": "1.0.0",
-  "description": "Personal Amazon shopping CLI",
+  "version": "2.0.0",
+  "description": "Amazon shopping CLI, MCP server, and API for AI agents",
   "type": "module",
-  "bin": {
-    "amz": "./dist/index.js"
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./mcp": "./dist/mcp.js"
   },
+  "bin": {
+    "amz": "./dist/cli.js",
+    "amazon-cli": "./dist/cli.js",
+    "amazon-mcp": "./dist/mcp.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx src/cli.ts",
     "build": "tsup",
-    "start": "node dist/index.js"
+    "start": "node dist/cli.js",
+    "mcp": "node dist/mcp.js",
+    "health": "tsx scripts/health-check.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -19,8 +32,10 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^13.0.0",
     "picocolors": "^1.1.0",
-    "playwright": "^1.50.0"
+    "playwright": "^1.50.0",
+    "zod": "^4.3.6"
   }
 }
