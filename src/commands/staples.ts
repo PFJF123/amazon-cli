@@ -2,13 +2,36 @@ import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { ProductPage } from '../pages/product.page.js';
 import { listStaples, addStaple, removeStaple } from '../store/staples-store.js';
-import { formatStaples } from '../ui/formatters.js';
+import { formatStaples, formatJson } from '../ui/formatters.js';
 import { inputStaple, selectStaples, confirmAction } from '../ui/prompts.js';
 import type { Staple } from '../models/product.js';
 
-export function staplesListCommand(category?: string): void {
+export function staplesListCommand(category?: string, output?: string): void {
   const staples = listStaples(category);
-  console.log(formatStaples(staples));
+  if (output === 'json') {
+    console.log(formatJson(staples));
+  } else {
+    console.log(formatStaples(staples));
+  }
+}
+
+export function staplesEditCommand(asin: string, opts: { qty?: string; category?: string }): void {
+  const existing = listStaples().find((s) => s.asin === asin);
+  if (!existing) {
+    console.log(pc.yellow(`\n  Staple "${asin}" not found. Use \`amz staples add\` to add it first.\n`));
+    return;
+  }
+
+  const quantity = opts.qty ? parseInt(opts.qty) : existing.quantity;
+  const category = opts.category ?? existing.category;
+
+  if (isNaN(quantity) || quantity < 1) {
+    console.log(pc.red('\n  Quantity must be a positive number.\n'));
+    return;
+  }
+
+  addStaple({ ...existing, quantity, category });
+  console.log(pc.green(`\n  Updated ${asin}: qty=${quantity}, category=${category}\n`));
 }
 
 interface StaplesAddOpts {

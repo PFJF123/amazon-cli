@@ -2,43 +2,69 @@ import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { OrdersPage } from '../pages/orders.page.js';
 import { ProductPage } from '../pages/product.page.js';
-import { formatOrders } from '../ui/formatters.js';
+import { formatOrders, formatJson } from '../ui/formatters.js';
 import { confirmAction } from '../ui/prompts.js';
 
-export async function ordersCommand(period: string | undefined, opts: SessionOptions): Promise<void> {
-  await withSession(opts, async (page) => {
-    const ordersPage = new OrdersPage(page);
-
-    console.log(pc.dim(`\n  Loading orders (${period ?? '3m'})...\n`));
-    const orders = await ordersPage.getOrders(period ?? '3m');
-    console.log(formatOrders(orders));
-  });
+interface OrdersListOpts extends SessionOptions {
+  output?: string;
 }
 
-export async function orderDetailCommand(orderId: string, opts: SessionOptions): Promise<void> {
+export async function ordersCommand(period: string | undefined, opts: OrdersListOpts): Promise<void> {
+  const isJson = opts.output === 'json';
   await withSession(opts, async (page) => {
     const ordersPage = new OrdersPage(page);
 
-    console.log(pc.dim(`\n  Loading order ${orderId}...\n`));
-    const order = await ordersPage.getOrderDetail(orderId);
+    if (!isJson) console.log(pc.dim(`\n  Loading orders (${period ?? '3m'})...\n`));
+    const orders = await ordersPage.getOrders(period ?? '3m');
 
-    if (order) {
-      console.log(formatOrders([order]));
+    if (isJson) {
+      console.log(formatJson(orders));
     } else {
-      console.log(pc.yellow(`\n  Order ${orderId} not found.\n`));
+      console.log(formatOrders(orders));
     }
   });
 }
 
-export async function orderTrackCommand(orderId: string, opts: SessionOptions): Promise<void> {
+export async function orderDetailCommand(orderId: string, opts: OrdersListOpts): Promise<void> {
+  const isJson = opts.output === 'json';
   await withSession(opts, async (page) => {
     const ordersPage = new OrdersPage(page);
 
-    console.log(pc.dim(`\n  Loading tracking info for ${orderId}...\n`));
+    if (!isJson) console.log(pc.dim(`\n  Loading order ${orderId}...\n`));
+    const order = await ordersPage.getOrderDetail(orderId);
+
+    if (!order) {
+      console.log(pc.yellow(`\n  Order ${orderId} not found.\n`));
+      return;
+    }
+
+    if (isJson) {
+      console.log(formatJson(order));
+    } else {
+      console.log(formatOrders([order]));
+    }
+  });
+}
+
+export async function orderTrackCommand(orderId: string, opts: OrdersListOpts): Promise<void> {
+  const isJson = opts.output === 'json';
+  await withSession(opts, async (page) => {
+    const ordersPage = new OrdersPage(page);
+
+    if (!isJson) console.log(pc.dim(`\n  Loading tracking info for ${orderId}...\n`));
     const order = await ordersPage.getOrderDetail(orderId);
 
     if (!order) {
       console.log(pc.yellow(`  Order ${orderId} not found.\n`));
+      return;
+    }
+
+    if (isJson) {
+      console.log(formatJson({
+        status: order.status,
+        estimatedDelivery: order.estimatedDelivery,
+        trackingUrl: order.trackingUrl,
+      }));
       return;
     }
 
@@ -115,5 +141,43 @@ export async function orderReorderCommand(orderId: string, opts: SessionOptions)
       console.log(pc.green(`  All ${succeeded} items added to cart.`));
     }
     console.log(pc.dim('  Run `amz checkout` to complete your order.\n'));
+  });
+}
+
+export async function orderCancelCommand(orderId: string, opts: SessionOptions): Promise<void> {
+  await withSession(opts, async (page) => {
+    const ordersPage = new OrdersPage(page);
+
+    console.log(pc.dim(`\n  Looking for cancel option on order ${orderId}...\n`));
+    const found = await ordersPage.cancelOrder(orderId);
+
+    if (!found) {
+      console.log(pc.yellow('  This order cannot be cancelled (may have already shipped or been delivered).\n'));
+      return;
+    }
+
+    console.log(pc.dim('  Cancel page opened. Complete the cancellation in the browser window.'));
+    console.log(pc.dim('  Press Enter when done...\n'));
+    await new Promise<void>((resolve) => { process.stdin.once('data', () => resolve()); });
+    console.log(pc.green('  Done.\n'));
+  });
+}
+
+export async function orderReturnCommand(orderId: string, opts: SessionOptions): Promise<void> {
+  await withSession(opts, async (page) => {
+    const ordersPage = new OrdersPage(page);
+
+    console.log(pc.dim(`\n  Looking for return option on order ${orderId}...\n`));
+    const found = await ordersPage.initiateReturn(orderId);
+
+    if (!found) {
+      console.log(pc.yellow('  No return option found for this order (may not be eligible).\n'));
+      return;
+    }
+
+    console.log(pc.dim('  Return page opened. Complete the return process in the browser window.'));
+    console.log(pc.dim('  Press Enter when done...\n'));
+    await new Promise<void>((resolve) => { process.stdin.once('data', () => resolve()); });
+    console.log(pc.green('  Done.\n'));
   });
 }

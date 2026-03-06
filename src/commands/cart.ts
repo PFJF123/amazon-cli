@@ -2,15 +2,27 @@ import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { CartPage } from '../pages/cart.page.js';
 import { ProductPage } from '../pages/product.page.js';
-import { formatCart } from '../ui/formatters.js';
+import { formatCart, formatJson } from '../ui/formatters.js';
 import { confirmAction } from '../ui/prompts.js';
+import { validateAsin } from '../utils/validate.js';
 
-export async function cartListCommand(opts: SessionOptions): Promise<void> {
+interface CartListOpts extends SessionOptions {
+  output?: string;
+}
+
+export async function cartListCommand(opts: CartListOpts): Promise<void> {
+  const isJson = opts.output === 'json';
   await withSession(opts, async (page) => {
     const cartPage = new CartPage(page);
 
-    console.log(pc.dim('\n  Loading cart...\n'));
-    const { items, subtotal, groceryItems, grocerySubtotal } = await cartPage.listItems();
+    if (!isJson) console.log(pc.dim('\n  Loading cart...\n'));
+    const contents = await cartPage.listItems();
+    const { items, subtotal, groceryItems, grocerySubtotal } = contents;
+
+    if (isJson) {
+      console.log(formatJson(contents));
+      return;
+    }
 
     const hasRegular = items.length > 0;
     const hasGrocery = groceryItems.length > 0;
@@ -33,6 +45,7 @@ export async function cartListCommand(opts: SessionOptions): Promise<void> {
 }
 
 export async function cartAddCommand(asin: string, qty: string | undefined, opts: SessionOptions): Promise<void> {
+  validateAsin(asin);
   await withSession(opts, async (page) => {
     const productPage = new ProductPage(page);
     const quantity = qty ? parseInt(qty) : 1;
@@ -44,6 +57,7 @@ export async function cartAddCommand(asin: string, qty: string | undefined, opts
 }
 
 export async function cartRemoveCommand(asin: string, opts: SessionOptions): Promise<void> {
+  validateAsin(asin);
   await withSession(opts, async (page) => {
     const cartPage = new CartPage(page);
 
@@ -58,6 +72,7 @@ export async function cartRemoveCommand(asin: string, opts: SessionOptions): Pro
 }
 
 export async function cartUpdateCommand(asin: string, qty: string, opts: SessionOptions): Promise<void> {
+  validateAsin(asin);
   const quantity = parseInt(qty);
   if (isNaN(quantity) || quantity < 1) {
     console.log(pc.red('\n  Quantity must be a positive number.\n'));

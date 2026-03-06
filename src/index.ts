@@ -1,15 +1,17 @@
 import { Command } from 'commander';
 import { handleError } from './errors/index.js';
+import { loadConfig } from './store/config-store.js';
 import { loginCommand } from './commands/login.js';
 import { searchCommand } from './commands/search.js';
 import { productCommand } from './commands/product.js';
 import { cartListCommand, cartAddCommand, cartRemoveCommand, cartUpdateCommand, cartClearCommand } from './commands/cart.js';
-import { staplesListCommand, staplesAddCommand, staplesRemoveCommand, staplesOrderCommand } from './commands/staples.js';
-import { ordersCommand, orderDetailCommand, orderTrackCommand, orderReorderCommand } from './commands/orders.js';
+import { staplesListCommand, staplesAddCommand, staplesRemoveCommand, staplesOrderCommand, staplesEditCommand } from './commands/staples.js';
+import { ordersCommand, orderDetailCommand, orderTrackCommand, orderReorderCommand, orderCancelCommand, orderReturnCommand } from './commands/orders.js';
 import { checkoutCommand } from './commands/checkout.js';
 import { grocerySearchCommand, groceryCategoriesCommand, groceryBrowseCommand, groceryAddCommand, grocerySetAddressCommand, groceryInfoCommand } from './commands/grocery.js';
 import { addressListCommand, addressSetCommand } from './commands/address.js';
 import { subscribeListCommand, subscribeInfoCommand, subscribeAddCommand } from './commands/subscribe.js';
+import { configSetCommand, configGetCommand, configListCommand } from './commands/config.js';
 
 const program = new Command();
 
@@ -20,17 +22,22 @@ program
   .option('--headed', 'Run browser in headed mode (default)', true)
   .option('--headless', 'Run browser in headless mode')
   .option('--debug', 'Enable debug output')
-  .option('--timeout <ms>', 'Browser timeout in milliseconds', '30000');
+  .option('--timeout <ms>', 'Browser timeout in milliseconds')
+  .option('--output <format>', 'Output format: table (default) or json');
 
 function getGlobalOpts() {
   const opts = program.opts();
+  const config = loadConfig();
   if (opts.debug) {
     process.env.AMZ_DEBUG = '1';
   }
   return {
-    headless: opts.headless ?? false,
-    timeout: parseInt(opts.timeout),
+    headless: opts.headless ?? config.defaultHeadless ?? false,
+    timeout: opts.timeout ? parseInt(opts.timeout) : config.defaultTimeout ?? 30000,
     debug: opts.debug ?? false,
+    output: opts.output as string | undefined,
+    defaultStore: config.defaultStore,
+    defaultLimit: config.defaultLimit,
   };
 }
 
@@ -57,7 +64,8 @@ program
   .option('--add', 'Interactive: select results to add to cart')
   .action(async (query, opts) => {
     try {
-      await searchCommand(query, { ...getGlobalOpts(), ...opts });
+      const g = getGlobalOpts();
+      await searchCommand(query, { ...g, ...opts, limit: opts.limit ?? g.defaultLimit });
     } catch (err) {
       handleError(err);
     }
@@ -142,7 +150,7 @@ staples
   .description('List saved staples')
   .action((category) => {
     try {
-      staplesListCommand(category);
+      staplesListCommand(category, getGlobalOpts().output);
     } catch (err) {
       handleError(err);
     }
@@ -157,6 +165,19 @@ staples
   .action(async (opts) => {
     try {
       await staplesAddCommand({ ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+staples
+  .command('edit <asin>')
+  .description('Edit a staple item quantity or category')
+  .option('--qty <quantity>', 'New quantity')
+  .option('--category <category>', 'New category name')
+  .action((asin, opts) => {
+    try {
+      staplesEditCommand(asin, opts);
     } catch (err) {
       handleError(err);
     }
@@ -242,6 +263,28 @@ orders
     }
   });
 
+orders
+  .command('cancel <id>')
+  .description('Cancel an unshipped order')
+  .action(async (id) => {
+    try {
+      await orderCancelCommand(id, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+orders
+  .command('return <id>')
+  .description('Initiate a return for an order')
+  .action(async (id) => {
+    try {
+      await orderReturnCommand(id, getGlobalOpts());
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
 // amz grocery
 const grocery = program.command('grocery').description('Whole Foods & Amazon Fresh grocery shopping');
 
@@ -276,7 +319,8 @@ grocery
   .option('--pickup', 'Add items for pickup instead of delivery')
   .action(async (query, opts) => {
     try {
-      await grocerySearchCommand(query, { ...getGlobalOpts(), ...opts });
+      const g = getGlobalOpts();
+      await grocerySearchCommand(query, { ...g, ...opts, store: opts.store ?? g.defaultStore, limit: opts.limit ?? g.defaultLimit });
     } catch (err) {
       handleError(err);
     }
@@ -288,7 +332,8 @@ grocery
   .option('--store <store>', 'Store: wholefoods or fresh (default: wholefoods)')
   .action(async (opts) => {
     try {
-      await groceryCategoriesCommand({ ...getGlobalOpts(), ...opts });
+      const g = getGlobalOpts();
+      await groceryCategoriesCommand({ ...g, ...opts, store: opts.store ?? g.defaultStore });
     } catch (err) {
       handleError(err);
     }
@@ -303,7 +348,8 @@ grocery
   .option('--pickup', 'Add items for pickup instead of delivery')
   .action(async (category, opts) => {
     try {
-      await groceryBrowseCommand(category, { ...getGlobalOpts(), ...opts });
+      const g = getGlobalOpts();
+      await groceryBrowseCommand(category, { ...g, ...opts, store: opts.store ?? g.defaultStore, limit: opts.limit ?? g.defaultLimit });
     } catch (err) {
       handleError(err);
     }
@@ -393,6 +439,42 @@ program
   .action(async (opts) => {
     try {
       await checkoutCommand({ ...getGlobalOpts(), ...opts });
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+// amz config
+const config = program.command('config').description('Manage CLI configuration');
+
+config
+  .command('set <key> <value>')
+  .description('Set a config value (keys: defaultStore, defaultHeadless, defaultLimit, defaultTimeout)')
+  .action((key, value) => {
+    try {
+      configSetCommand(key, value);
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+config
+  .command('get [key]')
+  .description('Get a config value (omit key to list all)')
+  .action((key) => {
+    try {
+      configGetCommand(key);
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+config
+  .command('list')
+  .description('List all config values')
+  .action(() => {
+    try {
+      configListCommand();
     } catch (err) {
       handleError(err);
     }

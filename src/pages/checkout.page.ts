@@ -3,6 +3,7 @@ import { BasePage } from './base.page.js';
 import { SELECTORS } from '../selectors/index.js';
 import type { DeliverySlot } from '../models/product.js';
 import { humanDelay } from '../browser/humanize.js';
+import { AmzError } from '../errors/index.js';
 
 export interface CheckoutSummary {
   address: string | null;
@@ -23,9 +24,45 @@ export class CheckoutPage extends BasePage {
     await ptcBtn.click();
     await humanDelay(2000, 4000);
     await this.checkAuth();
+
+    // Detect payment method issues
+    const url = this.page.url();
+    if (url.includes('/payment-select') || url.includes('payment-method') || url.includes('/pp/payselect')) {
+      throw new AmzError('Payment method requires attention — please update it on Amazon.com before checking out.');
+    }
   }
 
   async getSummary(): Promise<CheckoutSummary> {
+    // Detect items that became unavailable during checkout
+    const oosItems = await this.findAll(
+      ['.sc-item-unavailable-msg', '[class*="item-unavailable"]', ':has-text("currently unavailable")'] as string[],
+      2000,
+    );
+    if (oosItems.length > 0) {
+      const titles: string[] = [];
+      for (const item of oosItems) {
+        const text = await item.textContent().catch(() => null);
+        if (text && text.trim()) titles.push(text.trim().slice(0, 80));
+      }
+      throw new AmzError(`Some cart items became unavailable: ${titles.join('; ')}`);
+    }
+
+    // Detect address confirmation modal and auto-confirm
+    const unconfirmed = await this.tryFindFirst(
+      ['[class*="ship-to-address-unconfirmed"]', '.ship-to-address-change', '[id*="address-book-entry"]'] as string[],
+      2000,
+    );
+    if (unconfirmed) {
+      const confirmBtn = await this.tryFindFirst(
+        ['input[type="submit"]', '.a-button-primary input', '#continue-top', 'input[name="continue"]'] as string[],
+        3000,
+      );
+      if (confirmBtn) {
+        await confirmBtn.click();
+        await humanDelay(2000, 3000);
+      }
+    }
+
     const address = await this.getText(SELECTORS.checkout.deliveryAddress, 5000);
     const total = await this.getText(SELECTORS.checkout.orderTotal, 5000);
 

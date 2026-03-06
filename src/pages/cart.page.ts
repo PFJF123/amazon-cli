@@ -114,7 +114,8 @@ export class CartPage extends BasePage {
             if ((await qtyEl.count()) > 0) {
               await qtyEl.selectOption(String(quantity));
               await humanDelay(1500, 2500);
-              return true;
+              const actual = await qtyEl.inputValue({ timeout: 2000 }).catch(() => null);
+              return actual === null || parseInt(actual) === quantity;
             }
           } catch {
             continue;
@@ -180,9 +181,15 @@ export class CartPage extends BasePage {
     while (true) {
       const itemLocators = await this.findAll(SELECTORS.cart.cartItems, 3000);
       if (itemLocators.length === 0) break;
+      const countBefore = itemLocators.length;
       await this.clickFirstMatch(itemLocators[0], SELECTORS.cart.cartItemDelete);
       await humanDelay(1500, 2500);
-      removed++;
+      const afterLocators = await this.findAll(SELECTORS.cart.cartItems, 3000);
+      if (afterLocators.length < countBefore) {
+        removed++;
+      } else {
+        break; // delete didn't work, stop to avoid infinite loop
+      }
     }
     return removed;
   }

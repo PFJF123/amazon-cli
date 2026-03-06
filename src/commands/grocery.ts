@@ -1,8 +1,9 @@
 import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { GroceryPage, type GroceryStore, type FulfillmentMode } from '../pages/grocery.page.js';
-import { formatProductTable } from '../ui/formatters.js';
+import { formatProductTable, formatJson } from '../ui/formatters.js';
 import { selectProducts } from '../ui/prompts.js';
+import { validateAsin } from '../utils/validate.js';
 
 const VALID_STORES: GroceryStore[] = ['wholefoods', 'fresh'];
 
@@ -11,6 +12,7 @@ interface GrocerySearchOpts extends SessionOptions {
   limit?: number;
   add?: boolean;
   pickup?: boolean;
+  output?: string;
 }
 
 interface GroceryAddOpts extends SessionOptions {
@@ -42,6 +44,7 @@ export async function grocerySetAddressCommand(query: string, opts: SessionOptio
 }
 
 export async function groceryInfoCommand(asin: string, opts: SessionOptions): Promise<void> {
+  validateAsin(asin);
   await withSession(opts, async (page) => {
     const groceryPage = new GroceryPage(page);
 
@@ -60,13 +63,19 @@ export async function groceryInfoCommand(asin: string, opts: SessionOptions): Pr
 
 export async function grocerySearchCommand(query: string, opts: GrocerySearchOpts): Promise<void> {
   const store = validateStore(opts.store);
+  const isJson = opts.output === 'json';
 
   await withSession(opts, async (page) => {
     const groceryPage = new GroceryPage(page);
     const mode: FulfillmentMode = opts.pickup ? 'pickup' : 'delivery';
 
-    console.log(pc.dim(`\n  Searching ${store === 'wholefoods' ? 'Whole Foods' : 'Amazon Fresh'} for "${query}"...\n`));
+    if (!isJson) console.log(pc.dim(`\n  Searching ${store === 'wholefoods' ? 'Whole Foods' : 'Amazon Fresh'} for "${query}"...\n`));
     const products = await groceryPage.search(query, store, opts.limit ?? 10);
+
+    if (isJson) {
+      console.log(formatJson(products));
+      return;
+    }
 
     if (products.length === 0 && store === 'fresh') {
       console.log(pc.yellow('  Amazon Fresh is not available for your delivery address.\n'));
@@ -91,12 +100,18 @@ export async function grocerySearchCommand(query: string, opts: GrocerySearchOpt
 
 export async function groceryCategoriesCommand(opts: GrocerySearchOpts): Promise<void> {
   const store = validateStore(opts.store);
+  const isJson = opts.output === 'json';
 
   await withSession(opts, async (page) => {
     const groceryPage = new GroceryPage(page);
 
-    console.log(pc.dim(`\n  Loading ${store === 'wholefoods' ? 'Whole Foods' : 'Amazon Fresh'} categories...\n`));
+    if (!isJson) console.log(pc.dim(`\n  Loading ${store === 'wholefoods' ? 'Whole Foods' : 'Amazon Fresh'} categories...\n`));
     const categories = await groceryPage.getCategories(store);
+
+    if (isJson) {
+      console.log(formatJson(categories));
+      return;
+    }
 
     if (categories.length === 0) {
       console.log(pc.yellow('  No categories found.\n'));
@@ -113,12 +128,13 @@ export async function groceryCategoriesCommand(opts: GrocerySearchOpts): Promise
 
 export async function groceryBrowseCommand(category: string, opts: GrocerySearchOpts): Promise<void> {
   const store = validateStore(opts.store);
+  const isJson = opts.output === 'json';
 
   await withSession(opts, async (page) => {
     const groceryPage = new GroceryPage(page);
     const mode: FulfillmentMode = opts.pickup ? 'pickup' : 'delivery';
 
-    console.log(pc.dim(`\n  Finding category "${category}"...\n`));
+    if (!isJson) console.log(pc.dim(`\n  Finding category "${category}"...\n`));
     const categories = await groceryPage.getCategories(store);
     const match = categories.find(
       (c) => c.name.toLowerCase().includes(category.toLowerCase()),
@@ -129,8 +145,14 @@ export async function groceryBrowseCommand(category: string, opts: GrocerySearch
       return;
     }
 
-    console.log(pc.dim(`  Browsing ${match.name}...\n`));
+    if (!isJson) console.log(pc.dim(`  Browsing ${match.name}...\n`));
     const products = await groceryPage.browseCategory(match.url, opts.limit ?? 10);
+
+    if (isJson) {
+      console.log(formatJson(products));
+      return;
+    }
+
     console.log(formatProductTable(products));
 
     if (opts.add && products.length > 0) {
@@ -148,6 +170,7 @@ export async function groceryBrowseCommand(category: string, opts: GrocerySearch
 }
 
 export async function groceryAddCommand(asin: string, qty: string | undefined, opts: GroceryAddOpts): Promise<void> {
+  validateAsin(asin);
   await withSession(opts, async (page) => {
     const groceryPage = new GroceryPage(page);
     const quantity = qty ? parseInt(qty) : 1;

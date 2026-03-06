@@ -1,13 +1,25 @@
 import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { SubscribePage } from '../pages/subscribe.page.js';
+import { validateAsin } from '../utils/validate.js';
+import { formatJson } from '../ui/formatters.js';
 
-export async function subscribeListCommand(opts: SessionOptions): Promise<void> {
+interface SubscribeListOpts extends SessionOptions {
+  output?: string;
+}
+
+export async function subscribeListCommand(opts: SubscribeListOpts): Promise<void> {
+  const isJson = opts.output === 'json';
   await withSession(opts, async (page) => {
     const subscribePage = new SubscribePage(page);
 
-    console.log(pc.dim('\n  Loading subscriptions...\n'));
+    if (!isJson) console.log(pc.dim('\n  Loading subscriptions...\n'));
     const subscriptions = await subscribePage.listSubscriptions();
+
+    if (isJson) {
+      console.log(formatJson(subscriptions));
+      return;
+    }
 
     if (subscriptions.length === 0) {
       console.log(pc.dim('  No active Subscribe & Save subscriptions.\n'));
@@ -26,12 +38,19 @@ export async function subscribeListCommand(opts: SessionOptions): Promise<void> 
   });
 }
 
-export async function subscribeInfoCommand(asin: string, opts: SessionOptions): Promise<void> {
+export async function subscribeInfoCommand(asin: string, opts: SubscribeListOpts): Promise<void> {
+  validateAsin(asin);
+  const isJson = opts.output === 'json';
   await withSession(opts, async (page) => {
     const subscribePage = new SubscribePage(page);
 
-    console.log(pc.dim(`\n  Checking Subscribe & Save for ${asin}...\n`));
+    if (!isJson) console.log(pc.dim(`\n  Checking Subscribe & Save for ${asin}...\n`));
     const info = await subscribePage.getProductSnsInfo(asin);
+
+    if (isJson) {
+      console.log(formatJson(info));
+      return;
+    }
 
     if (!info.available) {
       console.log(pc.yellow('  Subscribe & Save is not available for this product.\n'));
@@ -50,6 +69,7 @@ export async function subscribeInfoCommand(asin: string, opts: SessionOptions): 
 }
 
 export async function subscribeAddCommand(asin: string, opts: SessionOptions & { frequency?: number }): Promise<void> {
+  validateAsin(asin);
   await withSession(opts, async (page) => {
     const subscribePage = new SubscribePage(page);
     const frequencyIndex = (opts.frequency ?? 1) - 1; // CLI uses 1-based

@@ -3,10 +3,16 @@ import { withSession, type SessionOptions } from '../browser/session.js';
 import { GroceryPage } from '../pages/grocery.page.js';
 import { SELECTORS } from '../selectors/index.js';
 import { humanDelay } from '../browser/humanize.js';
+import { formatJson } from '../ui/formatters.js';
 
-export async function addressListCommand(opts: SessionOptions): Promise<void> {
+interface AddressListOpts extends SessionOptions {
+  output?: string;
+}
+
+export async function addressListCommand(opts: AddressListOpts): Promise<void> {
+  const isJson = opts.output === 'json';
   await withSession(opts, async (page) => {
-    console.log(pc.dim('\n  Loading addresses...\n'));
+    if (!isJson) console.log(pc.dim('\n  Loading addresses...\n'));
 
     await page.goto('https://www.amazon.com/a/addresses', { waitUntil: 'domcontentloaded' });
     await humanDelay(1000, 2000);
@@ -15,9 +21,15 @@ export async function addressListCommand(opts: SessionOptions): Promise<void> {
     const count = await cards.count();
 
     if (count === 0) {
-      console.log(pc.yellow('  No saved addresses found.\n'));
+      if (isJson) {
+        console.log(formatJson([]));
+      } else {
+        console.log(pc.yellow('  No saved addresses found.\n'));
+      }
       return;
     }
+
+    const addressData: { lines: string[]; isDefault: boolean }[] = [];
 
     for (let i = 0; i < count; i++) {
       try {
@@ -34,16 +46,23 @@ export async function addressListCommand(opts: SessionOptions): Promise<void> {
         if (addressLines.length === 0) continue;
 
         const isDefault = (await card.locator('.a-badge, span:has-text("Default")').count()) > 0;
-        const label = isDefault ? pc.green(' (default)') : '';
+        addressData.push({ lines: addressLines, isDefault });
 
-        console.log(pc.bold(`  ${i + 1}. ${addressLines[0]}${label}`));
-        for (const line of addressLines.slice(1)) {
-          console.log(pc.dim(`     ${line}`));
+        if (!isJson) {
+          const label = isDefault ? pc.green(' (default)') : '';
+          console.log(pc.bold(`  ${i + 1}. ${addressLines[0]}${label}`));
+          for (const line of addressLines.slice(1)) {
+            console.log(pc.dim(`     ${line}`));
+          }
+          console.log('');
         }
-        console.log('');
       } catch {
         continue;
       }
+    }
+
+    if (isJson) {
+      console.log(formatJson(addressData));
     }
   });
 }

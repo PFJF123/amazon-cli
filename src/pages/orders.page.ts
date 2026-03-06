@@ -161,6 +161,38 @@ export class OrdersPage extends BasePage {
     return items;
   }
 
+  async cancelOrder(orderId: string): Promise<boolean> {
+    await this.navigateTo(`https://www.amazon.com/gp/your-account/order-details?orderID=${orderId}`);
+    await this.checkAuth();
+    await humanDelay(1000, 2000);
+
+    const cancelBtn = await this.tryFindFirst(
+      ['.cancel-items-button', 'a:has-text("Cancel items")', 'input[value*="Cancel"]'] as string[],
+      3000,
+    );
+    if (!cancelBtn) return false;
+
+    await cancelBtn.click();
+    await humanDelay(2000, 3000);
+    return true;
+  }
+
+  async initiateReturn(orderId: string): Promise<boolean> {
+    await this.navigateTo(`https://www.amazon.com/gp/your-account/order-details?orderID=${orderId}`);
+    await this.checkAuth();
+    await humanDelay(1000, 2000);
+
+    const returnBtn = await this.tryFindFirst(
+      ['a:has-text("Return or replace items")', 'a:has-text("Return")', 'a[href*="/returns/"]'] as string[],
+      3000,
+    );
+    if (!returnBtn) return false;
+
+    await returnBtn.click();
+    await humanDelay(2000, 3000);
+    return true;
+  }
+
   private async parseItemTitles(container: import('playwright').Locator) {
     const items = [];
     for (const sel of SELECTORS.orders.orderItemTitle) {

@@ -1,6 +1,10 @@
 import pc from 'picocolors';
 import type { Product, CartItem, Order, Staple } from '../models/product.js';
 
+export function formatJson(data: unknown): string {
+  return JSON.stringify(data, null, 2);
+}
+
 export function formatProductTable(products: Product[]): string {
   if (products.length === 0) return pc.dim('  No results found.\n');
 

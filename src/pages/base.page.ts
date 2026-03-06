@@ -114,6 +114,10 @@ export class BasePage {
     await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     await humanDelay(500, 1500);
     await this.waitForCaptchaResolution();
+    // Detect unexpected session expiry redirects
+    if (!url.includes('/ap/signin') && this.page.url().includes('/ap/signin')) {
+      throw new AuthRequiredError('Session expired. Run `amz login` to re-authenticate.');
+    }
   }
 
   parsePrice(text: string | null): number | null {

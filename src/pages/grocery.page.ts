@@ -226,7 +226,7 @@ export class GroceryPage extends BasePage {
           title: title.trim(),
           price: this.parsePrice(priceText),
           rating: ratingText ? parseFloat(ratingText.split(' ')[0]) : null,
-          reviewCount: reviewText ? parseInt(reviewText.replace(/[^0-9]/g, '')) || null : null,
+          reviewCount: reviewText ? (v => isNaN(v) ? null : v)(parseInt(reviewText.replace(/[^0-9]/g, ''))) : null,
           isPrime,
           imageUrl,
           url: `https://www.amazon.com/dp/${asin}`,
