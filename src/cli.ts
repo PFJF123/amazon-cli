@@ -5,7 +5,7 @@ import { loginCommand } from './commands/login.js';
 import { searchCommand } from './commands/search.js';
 import { productCommand } from './commands/product.js';
 import { cartListCommand, cartAddCommand, cartRemoveCommand, cartUpdateCommand, cartClearCommand } from './commands/cart.js';
-import { staplesListCommand, staplesAddCommand, staplesRemoveCommand, staplesOrderCommand, staplesEditCommand } from './commands/staples.js';
+import { staplesListCommand, staplesAddCommand, staplesRemoveCommand, staplesOrderCommand, staplesEditCommand, staplesSeedCommand } from './commands/staples.js';
 import { ordersCommand, orderDetailCommand, orderTrackCommand, orderReorderCommand, orderCancelCommand, orderReturnCommand } from './commands/orders.js';
 import { checkoutCommand } from './commands/checkout.js';
 import { grocerySearchCommand, groceryCategoriesCommand, groceryBrowseCommand, groceryAddCommand, grocerySetAddressCommand, groceryInfoCommand } from './commands/grocery.js';
@@ -193,6 +193,17 @@ staples
   .action((nameOrAsin) => {
     try {
       staplesRemoveCommand(nameOrAsin);
+    } catch (err) {
+      handleError(err);
+    }
+  });
+
+staples
+  .command('seed')
+  .description('Add default staple items (e.g. Cusqueña beer)')
+  .action(() => {
+    try {
+      staplesSeedCommand();
     } catch (err) {
       handleError(err);
     }

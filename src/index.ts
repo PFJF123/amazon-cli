@@ -7,7 +7,7 @@ export { listCart, removeFromCart, updateCartQty, clearCart } from './core/cart.
 export { listOrders, getOrder, trackOrder, reorderItems, cancelOrder, returnOrder } from './core/orders.js';
 export { grocerySearch, groceryCategories, groceryBrowse, groceryAdd, grocerySetAddress, groceryInfo } from './core/grocery.js';
 export { listSubscriptions, subscribeInfo, subscribeAdd } from './core/subscribe.js';
-export { listStaples, addStaple, removeStaple, getCategories, orderStaples } from './core/staples.js';
+export { listStaples, addStaple, removeStaple, getCategories, orderStaples, seedStaples, DEFAULT_STAPLES } from './core/staples.js';
 export { listAddresses, setAddress } from './core/address.js';
 export { loadConfig, saveConfig, setConfigValue, getConfigValue } from './core/config.js';
 export { getCheckoutSummary, placeOrder } from './core/checkout.js';

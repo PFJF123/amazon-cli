@@ -2,6 +2,16 @@ import fs from 'node:fs';
 import { STAPLES_FILE, ensureDataDir } from '../utils/paths.js';
 import type { Staple } from '../models/product.js';
 
+export const DEFAULT_STAPLES: Staple[] = [
+  {
+    asin: 'B078SJ1FB4',
+    title: 'Cusqueña Premium Lager Beer, 330ml Bottle (Pack of 24)',
+    quantity: 1,
+    category: 'Beverages',
+    addedAt: new Date().toISOString(),
+  },
+];
+
 function loadStaples(): Staple[] {
   try {
     const raw = fs.readFileSync(STAPLES_FILE, 'utf-8');
@@ -49,4 +59,22 @@ export function removeStaple(nameOrAsin: string): boolean {
 export function getCategories(): string[] {
   const all = loadStaples();
   return [...new Set(all.map((s) => s.category))];
+}
+
+export function seedStaples(): { added: number; skipped: number } {
+  const all = loadStaples();
+  let added = 0;
+  let skipped = 0;
+
+  for (const staple of DEFAULT_STAPLES) {
+    if (all.some((s) => s.asin === staple.asin)) {
+      skipped++;
+    } else {
+      all.push({ ...staple, addedAt: new Date().toISOString() });
+      added++;
+    }
+  }
+
+  if (added > 0) saveStaples(all);
+  return { added, skipped };
 }

@@ -1,10 +1,9 @@
 import type { Page } from 'playwright';
-import { listStaples, addStaple, removeStaple, getCategories } from '../store/staples-store.js';
 import { ProductPage } from '../pages/product.page.js';
 import type { Staple } from '../models/product.js';
 
 // Re-export store functions for convenience
-export { listStaples, addStaple, removeStaple, getCategories };
+export { listStaples, addStaple, removeStaple, getCategories, seedStaples, DEFAULT_STAPLES } from '../store/staples-store.js';
 
 export async function orderStaples(page: Page, items: Staple[]): Promise<{ succeeded: number; failed: number }> {
   const productPage = new ProductPage(page);

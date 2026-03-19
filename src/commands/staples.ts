@@ -1,7 +1,7 @@
 import pc from 'picocolors';
 import { withSession, type SessionOptions } from '../browser/session.js';
 import { ProductPage } from '../pages/product.page.js';
-import { listStaples, addStaple, removeStaple } from '../store/staples-store.js';
+import { listStaples, addStaple, removeStaple, seedStaples } from '../store/staples-store.js';
 import { formatStaples, formatJson } from '../ui/formatters.js';
 import { inputStaple, selectStaples, confirmAction } from '../ui/prompts.js';
 import type { Staple } from '../models/product.js';
@@ -86,6 +86,15 @@ export function staplesRemoveCommand(nameOrAsin: string): void {
     console.log(pc.green(`\n  Removed staple: ${nameOrAsin}\n`));
   } else {
     console.log(pc.yellow(`\n  Staple "${nameOrAsin}" not found.\n`));
+  }
+}
+
+export function staplesSeedCommand(): void {
+  const { added, skipped } = seedStaples();
+  if (added > 0) {
+    console.log(pc.green(`\n  Seeded ${added} default staple(s) (${skipped} already existed).\n`));
+  } else {
+    console.log(pc.dim('\n  All default staples already exist. Nothing to add.\n'));
   }
 }
 
